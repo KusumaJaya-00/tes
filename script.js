@@ -1,80 +1,142 @@
-// --- Seleksi Elemen Utama ---
+// --- SELEKSI ELEMEN ---
 const body = document.body;
 const btnTheme = document.getElementById("btn-theme");
+
+// FORM UTAMA
+const formTugas = document.getElementById("form-tugas");
 const inputTugas = document.getElementById("input-tugas");
-// Seleksi Input Tanggal Baru
 const inputTanggal = document.getElementById("input-tanggal");
-const btnTambah = document.getElementById("btn-tambah");
+const inputJam = document.getElementById("input-jam");
+const msgError = document.getElementById("msg-error"); // Pesan Error
+
 const listBelum = document.getElementById("list-belum");
 const listSelesai = document.getElementById("list-selesai");
+const judulBelum = document.getElementById("judul-belum");
+const judulSelesai = document.getElementById("judul-selesai");
 
-// --- Modal Elements ---
+// MODAL & FORM EDIT
+const modalEdit = document.getElementById("modal-edit");
+const formEdit = document.getElementById("form-edit");
+const inputEditModal = document.getElementById("input-edit-modal");
+const inputEditTanggal = document.getElementById("input-edit-tanggal");
+const inputEditJam = document.getElementById("input-edit-jam");
+const btnBatalEdit = document.getElementById("btn-batal-edit");
+
+// MODAL HAPUS
 const modalHapus = document.getElementById("modal-hapus");
 const btnBatalHapus = document.getElementById("btn-batal-hapus");
 const btnConfirmHapus = document.getElementById("btn-confirm-hapus");
 
-const modalEdit = document.getElementById("modal-edit");
-const inputEditModal = document.getElementById("input-edit-modal");
-const btnBatalEdit = document.getElementById("btn-batal-edit");
-const btnSimpanEdit = document.getElementById("btn-simpan-edit");
-
-const modalAlert = document.getElementById("modal-alert");
-const alertMessage = document.getElementById("alert-message");
-const btnOkAlert = document.getElementById("btn-ok-alert");
-
+// VARIABEL GLOBAL
 let itemYangAkanDihapus = null;
-let spanYangSedangDiedit = null;
+let liYangSedangDiedit = null;
 
-// --- Fungsi Alert Custom ---
-function showAlert(pesan) {
-  alertMessage.innerText = pesan;
-  modalAlert.classList.remove("hidden");
-  btnOkAlert.focus();
-}
-btnOkAlert.addEventListener("click", () => modalAlert.classList.add("hidden"));
-
-// --- Fitur Tema ---
-btnTheme.addEventListener("click", function () {
-  body.classList.toggle("light-mode");
-  if (body.classList.contains("light-mode")) {
-    btnTheme.innerText = "Dark Mode";
+// ==========================================
+// 1. MANAJEMEN WARNA INPUT DATE/TIME
+// ==========================================
+function updateInputColor(input) {
+  if (input.value) {
+    input.classList.add("has-value");
   } else {
-    btnTheme.innerText = "Light Mode";
+    input.classList.remove("has-value");
   }
+}
+
+const inputsDateTime = [inputTanggal, inputJam, inputEditTanggal, inputEditJam];
+inputsDateTime.forEach((input) => {
+  input.addEventListener("change", () => updateInputColor(input));
+  input.addEventListener("blur", () => updateInputColor(input));
 });
 
-// --- LOGIKA UTAMA ---
-function tambahTugas() {
-  const teks = inputTugas.value.trim();
-  const tanggalValue = inputTanggal.value; // Ambil nilai tanggal
+// ==========================================
+// 2. FUNGSI ERROR & VALIDASI
+// ==========================================
+function tampilkanError(pesan) {
+  msgError.innerText = pesan;
+  msgError.classList.remove("hidden");
+  inputTugas.classList.add("input-error");
+}
 
+function hapusError() {
+  msgError.classList.add("hidden");
+  inputTugas.classList.remove("input-error");
+}
+
+// Hapus error saat user mulai mengetik
+inputTugas.addEventListener("input", hapusError);
+
+// Cek Duplikat di List Belum Selesai (Case Insensitive)
+function cekDuplikat(text) {
+  const listItems = listBelum.querySelectorAll("li");
+  for (let li of listItems) {
+    if (li.dataset.text.toLowerCase() === text.toLowerCase()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ==========================================
+// 3. FUNGSI BANTUAN
+// ==========================================
+function updateJudulVisibility() {
+  if (listBelum.children.length === 0) judulBelum.classList.add("hidden");
+  else judulBelum.classList.remove("hidden");
+
+  if (listSelesai.children.length === 0) judulSelesai.classList.add("hidden");
+  else judulSelesai.classList.remove("hidden");
+}
+
+function formatTenggat(tgl, jam) {
+  if (!tgl) return { text: "Tanpa Tenggat", isSet: false };
+  const dateOptions = { day: "numeric", month: "short", year: "numeric" };
+  const dateObj = new Date(tgl);
+  const tglStr = dateObj.toLocaleDateString("id-ID", dateOptions);
+
+  if (jam) return { text: `Tenggat: ${tglStr} - Pukul ${jam}`, isSet: true };
+  return { text: `Tenggat: ${tglStr}`, isSet: true };
+}
+
+// --- FITUR TEMA ---
+btnTheme.addEventListener("click", function () {
+  body.classList.toggle("light-mode");
+  btnTheme.innerText = body.classList.contains("light-mode")
+    ? "Dark Mode"
+    : "Light Mode";
+});
+
+// ==========================================
+// 4. LOGIKA TAMBAH TUGAS (FORM SUBMIT)
+// ==========================================
+formTugas.addEventListener("submit", function (e) {
+  e.preventDefault(); // Matikan submit bawaan
+
+  const teks = inputTugas.value.trim();
+  const tglValue = inputTanggal.value;
+  const jamValue = inputJam.value;
+
+  // 1. Cek Required (Manual)
   if (teks === "") {
-    showAlert("Tugas tidak boleh kosong!");
+    tampilkanError("Tugas wajib diisi!");
     return;
   }
 
-  // Tentukan Tanggal yang akan ditampilkan
-  let waktuTampil = "";
-  const options = {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  };
-
-  if (tanggalValue) {
-    // Jika user memilih tanggal
-    const dateObj = new Date(tanggalValue);
-    waktuTampil = "Tenggat: " + dateObj.toLocaleString("id-ID", options);
-  } else {
-    // Jika kosong, pakai waktu sekarang (Default)
-    const now = new Date();
-    waktuTampil = "Dibuat: " + now.toLocaleString("id-ID", options);
+  // 2. Cek Duplikat
+  if (cekDuplikat(teks)) {
+    tampilkanError("Tugas ini sudah ada di daftar!");
+    return;
   }
 
-  // Buat Elemen
+  // Jika lolos validasi
+  hapusError();
+
   const li = document.createElement("li");
+
+  li.dataset.text = teks;
+  li.dataset.date = tglValue;
+  li.dataset.time = jamValue;
+
+  const infoTenggat = formatTenggat(tglValue, jamValue);
 
   const divInfo = document.createElement("div");
   divInfo.classList.add("task-info");
@@ -85,12 +147,14 @@ function tambahTugas() {
 
   const smallTanggal = document.createElement("small");
   smallTanggal.classList.add("task-date");
-  smallTanggal.innerText = waktuTampil;
+  smallTanggal.innerText = infoTenggat.text;
 
-  // Beri warna khusus jika itu adalah tenggat waktu
-  if (tanggalValue) {
+  if (infoTenggat.isSet) {
     smallTanggal.style.color = "var(--accent)";
     smallTanggal.style.fontWeight = "bold";
+  } else {
+    smallTanggal.style.color = "var(--text-secondary)";
+    smallTanggal.style.fontStyle = "italic";
   }
 
   divInfo.appendChild(spanTeks);
@@ -103,16 +167,19 @@ function tambahTugas() {
   const btnStatus = document.createElement("button");
   btnStatus.innerText = "Selesai";
   btnStatus.classList.add("btn-action", "btn-check");
+  btnStatus.type = "button";
 
   const btnEdit = document.createElement("button");
   btnEdit.innerText = "Edit";
   btnEdit.classList.add("btn-action", "btn-edit");
+  btnEdit.type = "button";
 
   const btnHapus = document.createElement("button");
   btnHapus.innerText = "Hapus";
   btnHapus.classList.add("btn-action", "btn-delete");
+  btnHapus.type = "button";
 
-  // Logic Buttons
+  // Events
   btnStatus.addEventListener("click", function () {
     if (btnStatus.innerText === "Selesai") {
       listSelesai.appendChild(li);
@@ -127,11 +194,19 @@ function tambahTugas() {
       btnStatus.classList.remove("btn-undo");
       btnStatus.classList.add("btn-check");
     }
+    updateJudulVisibility();
   });
 
   btnEdit.addEventListener("click", function () {
-    spanYangSedangDiedit = spanTeks;
-    inputEditModal.value = spanTeks.innerText;
+    liYangSedangDiedit = li;
+
+    inputEditModal.value = li.dataset.text;
+    inputEditTanggal.value = li.dataset.date;
+    inputEditJam.value = li.dataset.time;
+
+    updateInputColor(inputEditTanggal);
+    updateInputColor(inputEditJam);
+
     modalEdit.classList.remove("hidden");
     inputEditModal.focus();
   });
@@ -145,52 +220,78 @@ function tambahTugas() {
   divTombol.appendChild(btnEdit);
   divTombol.appendChild(btnHapus);
   li.appendChild(divTombol);
+
   listBelum.appendChild(li);
 
-  // Reset Input
-  inputTugas.value = "";
-  inputTanggal.value = ""; // Reset tanggal juga
-}
+  // Reset Form & Colors
+  formTugas.reset();
+  inputsDateTime.forEach((input) => input.classList.remove("has-value"));
+  updateJudulVisibility();
+});
 
-// --- Logic Modals ---
-function tutupModalEdit() {
-  modalEdit.classList.add("hidden");
-  spanYangSedangDiedit = null;
-}
-btnBatalEdit.addEventListener("click", tutupModalEdit);
+// ==========================================
+// 5. LOGIKA SIMPAN EDIT
+// ==========================================
+formEdit.addEventListener("submit", function (e) {
+  e.preventDefault();
 
-btnSimpanEdit.addEventListener("click", function () {
   const teksBaru = inputEditModal.value.trim();
-  if (teksBaru === "") {
-    showAlert("Tugas tidak boleh kosong!");
-    return;
+  const tglBaru = inputEditTanggal.value;
+  const jamBaru = inputEditJam.value;
+
+  // Untuk edit, kita biarkan saja validasi required browser (tidak perlu duplicate check disini, opsional)
+
+  if (liYangSedangDiedit) {
+    liYangSedangDiedit.dataset.text = teksBaru;
+    liYangSedangDiedit.dataset.date = tglBaru;
+    liYangSedangDiedit.dataset.time = jamBaru;
+
+    const spanTeks = liYangSedangDiedit.querySelector(".task-text");
+    const smallTanggal = liYangSedangDiedit.querySelector(".task-date");
+
+    spanTeks.innerText = teksBaru;
+
+    const infoTenggat = formatTenggat(tglBaru, jamBaru);
+    smallTanggal.innerText = infoTenggat.text;
+
+    if (infoTenggat.isSet) {
+      smallTanggal.style.color = "var(--accent)";
+      smallTanggal.style.fontWeight = "bold";
+      smallTanggal.style.fontStyle = "normal";
+    } else {
+      smallTanggal.style.color = "var(--text-secondary)";
+      smallTanggal.style.fontStyle = "italic";
+      smallTanggal.style.fontWeight = "normal";
+    }
   }
-  if (spanYangSedangDiedit) spanYangSedangDiedit.innerText = teksBaru;
   tutupModalEdit();
 });
-inputEditModal.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") btnSimpanEdit.click();
-});
+
+// --- Modal Helper Functions ---
+function tutupModalEdit() {
+  modalEdit.classList.add("hidden");
+  liYangSedangDiedit = null;
+}
+btnBatalEdit.addEventListener("click", tutupModalEdit);
 
 function tutupModalHapus() {
   modalHapus.classList.add("hidden");
   itemYangAkanDihapus = null;
 }
 btnBatalHapus.addEventListener("click", tutupModalHapus);
+
 btnConfirmHapus.addEventListener("click", function () {
   if (itemYangAkanDihapus) {
     itemYangAkanDihapus.remove();
     tutupModalHapus();
+    updateJudulVisibility();
   }
 });
 
 window.addEventListener("click", (e) => {
   if (e.target === modalHapus) tutupModalHapus();
   if (e.target === modalEdit) tutupModalEdit();
-  if (e.target === modalAlert) modalAlert.classList.add("hidden");
 });
 
-btnTambah.addEventListener("click", tambahTugas);
-inputTugas.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") tambahTugas();
-});
+// Init
+updateJudulVisibility();
